@@ -39,3 +39,6 @@ output/
 
 # Scratchpad
 scratch/
+
+# BigQuery Table Refs, ignored for now
+tableInfo/
