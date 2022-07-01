@@ -60,7 +60,7 @@ public class BigQueryReader {
      * 
      * @return Returns a PCollection of rows
      */
-    public PCollection<?> directReadWithSQLQuery() {
+    public PCollection<RowData> directReadWithSQLQuery() {
         String tableReferenceString = String.format("`%s:%s.%s`", this.tableReference.getProjectId(),
                 this.tableReference.getDatasetId(), this.tableReference.getTableId());
         ZonedDateTime startOfToday = LocalDate.now().atStartOfDay(ZoneOffset.UTC);
@@ -108,7 +108,7 @@ public class BigQueryReader {
                 startOfToday.minusDays(this.dayDelta).toLocalDate().toString(),
                 startOfToday.toString());
 
-        PCollection<?> rows = this.pipeline.apply("Read from BigQuery table with query string",
+        PCollection<RowData> rows = this.pipeline.apply("Read from BigQuery table with query string",
                 BigQueryIO.readTableRows().fromQuery(query).usingStandardSql().withMethod(Method.DIRECT_READ))
                 .apply("Transform returned table rows into Java Objects",
                         MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
