@@ -1,11 +1,13 @@
 package com.ncr.backstage.cost_insights;
 
+import java.nio.ByteBuffer;
+
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.transforms.PTransform;
+import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,40 +37,36 @@ public class BigtableWriter {
     }
 
     /**
-     * Takes in row data returned after querying the BigQuery billing export table.
-     * Checks the output Bigtable to see if required column families exist, and
-     * creates them if they don't exist.
-     * 
-     * @param rows are the rows returned after querying BigQuery
-     * @return returns the mutations needed to write the information to Bigtable
-     */
-    public PCollection<Mutation> getRequiredMutations(PCollection<RowData> rows) {
-        // TODO
-        return null;
-    }
-
-    /**
-     * Takes in a PCollection of mutation objects and applies them to the output
+     * Takes in a PCollection of RowData objects, maps them to Mutation objects and
+     * applies them to the output
      * Bigtable table
      * 
      * @param mutations is the PCollection of mutations passed in
      */
-    public void applyRowMutations(PCollection<Mutation> mutations) {
+    public void applyRowMutations(PCollection<RowData> rows) {
         CloudBigtableTableConfiguration bigtableTableConfig = new CloudBigtableTableConfiguration.Builder()
                 .withProjectId(options.getBigtableProjectId())
                 .withInstanceId(options.getBigtableInstanceId())
                 .withTableId(options.getBigtableTableId())
                 .build();
-        mutations.apply(CloudBigtableIO.writeToTable(bigtableTableConfig));
+        rows.apply(MapElements.via(ROWDATA_MUTATION)).apply(CloudBigtableIO.writeToTable(bigtableTableConfig));
     }
 
-    static class CheckBigtableColumns extends PTransform<PCollection<RowData>, PCollection<Mutation>> {
+    /**
+     * Transforms a RowData object to a Mutation
+     */
+    static final SimpleFunction<RowData, Mutation> ROWDATA_MUTATION = new SimpleFunction<RowData, Mutation>() {
 
         @Override
-        public PCollection<Mutation> expand(PCollection<RowData> input) {
-            // TODO Auto-generated method stub
-            return null;
+        public Mutation apply(RowData data) {
+            final byte[] ROW = (data.project_name + (((1L << 63) - 1) - data.usage_start_day_epoch_seconds)).getBytes();
+            final byte[] FAMILY = data.service_description.getBytes();
+            final byte[] QUALIFIER = data.sku_description.getBytes();
+            final Long TIMESTAMP = data.usage_start_day_epoch_seconds;
+            final byte[] VALUE = ByteBuffer.allocate(8).putDouble(data.sum_cost).array();
+            Mutation mutation = new Put(ROW).addColumn(FAMILY, QUALIFIER, TIMESTAMP, VALUE);
+            return mutation;
         }
-    }
+    };
 
 }

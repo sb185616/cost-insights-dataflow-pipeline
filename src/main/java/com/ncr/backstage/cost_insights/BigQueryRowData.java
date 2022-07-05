@@ -1,7 +1,5 @@
 package com.ncr.backstage.cost_insights;
 
-import java.math.BigDecimal;
-
 import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.coders.DefaultCoder;
 
@@ -20,7 +18,7 @@ class BigQueryRowData {
         String sku_description;
         String usage_start_day;
         Long usage_start_day_epoch_seconds;
-        BigDecimal sum_cost;
+        Double sum_cost;
 
         public static RowData fromTableRow(TableRow row) {
             RowData data = new RowData();
@@ -30,7 +28,7 @@ class BigQueryRowData {
             data.sku_description = (String) row.get(QueryReturnColumns.SKU_DESCRIPTION.label);
             data.usage_start_day = (String) row.get(QueryReturnColumns.USAGE_START_DAY.label);
             data.usage_start_day_epoch_seconds = (Long) row.get(QueryReturnColumns.USAGE_START_DAY_EPOCH_SECONDS.label);
-            data.sum_cost = new BigDecimal((String) row.get(QueryReturnColumns.SUM_COST.label));
+            data.sum_cost = ((Double) row.get(QueryReturnColumns.SUM_COST.label));
 
             return data;
         }
