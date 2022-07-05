@@ -1,0 +1,5 @@
+{
+    "project": "retail-cto-global-backstage",
+    "instance": "retail-backstage",
+    "table": "cost-insights-daily-aggregates"
+}

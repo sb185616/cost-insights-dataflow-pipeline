@@ -87,6 +87,15 @@ public class PipelineRunner {
         LOG.info("Using {} as input BigQuery table\n Using {} as the output Bigtable table", input.toString(), output);
 
         BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input, dayDelta);
-        PCollection<RowData> rowData = bigQueryReader.directReadWithSQLQuery();
+        PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
+
+        BigtableWriter bigtableWriter = new BigtableWriter(options);
+        PCollection<RowData> rowData = bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
+
+        bigtableWriter.applyRowMutations(rowData);
+
+        LOG.info("Running pipeline!");
+        pipeline.run().waitUntilFinish();
+
     }
 }
