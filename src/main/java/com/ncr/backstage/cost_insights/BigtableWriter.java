@@ -95,6 +95,7 @@ public class BigtableWriter {
                 BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
                 Table table = adminClient.getTable(options.getBigtableTableId());
                 columnFamilies = table.getColumnFamilies().stream().map(x -> x.getId()).collect(Collectors.toSet());
+                adminClient.close();
             } catch (Exception e) {
                 LOG.error("Could not fetch column families: {}", e.getMessage());
             }
@@ -122,6 +123,7 @@ public class BigtableWriter {
                     Table table = adminClient.getTable(options.getBigtableTableId());
                     try {
                         adminClient.modifyFamilies(ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
+                        adminClient.close();
                     } catch (AlreadyExistsException innerException) { // Should not occur, but keeping it here for now
                         LOG.error(innerException.getMessage());
                     }

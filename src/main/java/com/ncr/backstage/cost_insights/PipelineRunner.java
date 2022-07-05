@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -44,11 +45,13 @@ public class PipelineRunner {
         void setBigtableTableId(String bigtableTableId);
 
         @Description("JSON file containing the table reference to the BigQuery billing export table")
+        @Default.String("src/main/resources/tableInfo/bigqueryTableInfo.json")
         String getBigQueryTableReferenceJSON();
 
         void setBigQueryTableReferenceJSON(String bigQueryTableReferenceJSON);
 
         @Description("Billing export scan window")
+        @Default.Integer(2)
         int getDayDelta();
 
         void setDayDelta(int dayDelta);
