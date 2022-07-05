@@ -10,12 +10,16 @@ import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead.Method;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TypeDescriptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.api.services.bigquery.model.TableReference;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
 
 public class BigQueryReader {
 
+    /* Logger */
+    private static final Logger LOG = LoggerFactory.getLogger(BigQueryReader.class);
     /* The pipeline for which the BigQuery reads are being performed */
     private final Pipeline pipeline;
     /* The BigQuery table which is to be read from */
@@ -29,31 +33,7 @@ public class BigQueryReader {
         this.pipeline = pipeline;
         this.tableReference = tableReference;
         this.dayDelta = dayDelta;
-        // this.desiredFields = new ArrayList<String>();
-        // this.setFieldsToRead();
     }
-
-    // /**
-    // * Sets fields to read from the BigQuery Table. Fetches fields from the
-    // * BigQueryColumns Enum
-    // */
-    // private void setFieldsToRead() {
-    // Arrays.asList(BigQueryColumns.class.getEnumConstants()).forEach(x ->
-    // this.desiredFields.add(x.label));
-    // }
-
-    // public PCollection<?> directRead() {
-    // PCollection<?> rows = this.pipeline.apply("Read from BigQuery Table",
-    // BigQueryIO.readTableRows().from(this.tableReference).withMethod(Method.DIRECT_READ)
-    // .withSelectedFields(this.desiredFields)
-    // .withRowRestriction(String.format("%s > 0", BigQueryColumns.COST)) // where
-    // cost > 0
-    // // where usage start time starts with the desired date
-    // .withRowRestriction(String.format("STARTS_WITH(%s, '%s')",
-    // BigQueryColumns.USAGE_START_TIME,
-    // this.dateString)));
-    // return rows;
-    // }
 
     /**
      * Reads rows from the given BigQuery Table using a query string
@@ -64,6 +44,8 @@ public class BigQueryReader {
         String tableReferenceString = String.format("`%s:%s.%s`", this.tableReference.getProjectId(),
                 this.tableReference.getDatasetId(), this.tableReference.getTableId());
         ZonedDateTime startOfToday = LocalDate.now().atStartOfDay(ZoneOffset.UTC);
+        String aggregationDate = startOfToday.minusDays(this.dayDelta).toLocalDate().toString();
+        String billingExportScanWindowEnd = startOfToday.toString();
 
         String query = String.format("SELECT\n" +
                 "  %1$s AS %2$s,\n" + // project.name, project_name
@@ -105,13 +87,21 @@ public class BigQueryReader {
 
                 tableReferenceString,
                 BigQueryColumns.PARTITION_TIME,
-                startOfToday.minusDays(this.dayDelta).toLocalDate().toString(),
-                startOfToday.toString());
+                aggregationDate,
+                billingExportScanWindowEnd);
 
-        PCollection<RowData> rows = this.pipeline.apply("Read from BigQuery table with query string",
-                BigQueryIO.readTableRows().fromQuery(query).usingStandardSql().withMethod(Method.DIRECT_READ))
+        LOG.info("Setting aggregatiion date of {}, with a export scan window till the beginning of {}", aggregationDate,
+                billingExportScanWindowEnd);
+        LOG.info("Query to be run on {}:\n{}", tableReferenceString, query);
+        PCollection<RowData> rows = this.pipeline
+                .apply("Read from BigQuery table with query string",
+                        BigQueryIO.readTableRows()
+                                .fromQuery(query)
+                                .usingStandardSql()
+                                .withMethod(Method.DIRECT_READ))
                 .apply("Transform returned table rows into Java Objects",
-                        MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
+                        MapElements.into(TypeDescriptor.of(RowData.class))
+                                .via(RowData::fromTableRow));
         return rows;
     }
 
