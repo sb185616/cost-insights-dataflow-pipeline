@@ -15,7 +15,13 @@ import org.slf4j.LoggerFactory;
 
 import com.google.api.services.bigquery.model.TableReference;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
+import com.ncr.backstage.cost_insights.enums.BigQueryColumns;
+import com.ncr.backstage.cost_insights.enums.QueryReturnColumns;
 
+/**
+ * Class that defines steps required to read data from the BigQuery billing
+ * export table
+ */
 public class BigQueryReader {
 
     /* Logger */
@@ -26,9 +32,15 @@ public class BigQueryReader {
     private final TableReference tableReference;
     /* Number of days the aggregation date is behind the current day */
     private final int dayDelta;
-    /* List of fields to be read from the BigQuery Table */
-    // private final List<String> desiredFields;
 
+    /**
+     * Constructor
+     * 
+     * @param pipeline       is the apache beam pipeline being used
+     * @param tableReference is the reference to the input BigQuery table
+     * @param dayDelta       is the number of days the aggregation date is behind
+     *                       the current day
+     */
     public BigQueryReader(Pipeline pipeline, TableReference tableReference, int dayDelta) {
         this.pipeline = pipeline;
         this.tableReference = tableReference;
@@ -63,11 +75,11 @@ public class BigQueryReader {
                 "  AND %10$s > 0\n" + // cost
                 "  AND STARTS_WITH(STRING(%7$s, 'UTC'), %14$s)\n" + // usage_start_time, aggregation date
                 "GROUP BY\n" +
-                "  %2$s,\n" +
-                "  %4$s,\n" +
-                "  %6$s,\n" +
-                "  %8$s,\n" +
-                "  %9$s",
+                "  %2$s,\n" + // project_name
+                "  %4$s,\n" + // service_description
+                "  %6$s,\n" + // sku_description
+                "  %8$s,\n" + // usage_start_day
+                "  %9$s", // usage_start_day_epoch_seconds
 
                 BigQueryColumns.PROJECT_NAME,
                 QueryReturnColumns.PROJECT_NAME,

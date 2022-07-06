@@ -28,6 +28,9 @@ import com.google.cloud.bigtable.beam.CloudBigtableTableConfiguration;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
 import com.ncr.backstage.cost_insights.PipelineRunner.DataflowPipelineOptions;
 
+/**
+ * Class that defines steps required to write data to the Bigtable table
+ */
 public class BigtableWriter {
 
     /* Logger */

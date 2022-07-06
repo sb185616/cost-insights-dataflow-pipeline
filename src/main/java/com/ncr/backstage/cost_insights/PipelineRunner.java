@@ -75,6 +75,15 @@ public class PipelineRunner {
         return reference;
     }
 
+    /**
+     * Sets up and runs the pipeline
+     * 
+     * @param args command line args, used to pass in Bigtable table references /
+     *             BigQuery table reference JSON file path / day delta for cost
+     *             aggregation
+     * @throws Exception IOException thrown if JSON file containing BQ table data
+     *                   cannot be read
+     */
     public static void main(final String[] args) throws Exception {
 
         LOG.info("Creating Dataflow Aggregation Pipeline!");

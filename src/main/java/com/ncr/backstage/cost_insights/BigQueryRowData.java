@@ -4,6 +4,7 @@ import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.coders.DefaultCoder;
 
 import com.google.api.services.bigquery.model.TableRow;
+import com.ncr.backstage.cost_insights.enums.QueryReturnColumns;
 
 /**
  * Class to represent row data returned by BigQuery after being queried by the
