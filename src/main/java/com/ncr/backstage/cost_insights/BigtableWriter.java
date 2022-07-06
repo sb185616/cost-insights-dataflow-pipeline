@@ -51,14 +51,15 @@ public class BigtableWriter {
 
         @Override
         public PCollection<RowData> expand(PCollection<RowData> input) {
-            input.apply(MapElements.via(new SimpleFunction<RowData, String>() {
+            input.apply("Getting service name from each row", MapElements.via(new SimpleFunction<RowData, String>() {
                 @Override
                 public String apply(RowData data) {
                     return data.service_description;
                 }
-            })).apply(Distinct.<String>create())
-                    .apply(Filter.by(new FilterExistingFamilies(getSetOfExistingFamilies())))
-                    .apply(ParDo.of(new CreateColumnFamily(options)));
+            })).apply("Keeping only distinct service names", Distinct.<String>create())
+                    .apply("Keeping only service names that do not exist as column families",
+                            Filter.by(new FilterExistingFamilies(getSetOfExistingFamilies())))
+                    .apply("Creating required column families", ParDo.of(new CreateColumnFamily(options)));
 
             return input;
         }
@@ -155,7 +156,8 @@ public class BigtableWriter {
      */
     public PCollection<RowData> createNeededColumnFamilies(PCollection<RowData> rows) {
         LOG.info("Applying transform for creating required column families that do not exist!");
-        PCollection<RowData> rowsOut = rows.apply(new CheckColumnFamiliesAndReturnInput());
+        PCollection<RowData> rowsOut = rows.apply("Starting the process to create missing column families!",
+                new CheckColumnFamiliesAndReturnInput());
         return rowsOut;
     }
 
@@ -173,7 +175,8 @@ public class BigtableWriter {
                 .withInstanceId(options.getBigtableInstanceId())
                 .withTableId(options.getBigtableTableId())
                 .build();
-        rows.apply(MapElements.via(ROWDATA_MUTATION)).apply(CloudBigtableIO.writeToTable(bigtableTableConfig));
+        rows.apply("Converting RowData objects to Mutations", MapElements.via(ROWDATA_MUTATION))
+                .apply("Writing mutations to Bigtable", CloudBigtableIO.writeToTable(bigtableTableConfig));
     }
 
     /**

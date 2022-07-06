@@ -111,7 +111,7 @@ public class BigQueryReader {
                                 .fromQuery(query)
                                 .usingStandardSql()
                                 .withMethod(Method.DIRECT_READ))
-                .apply("Transform returned table rows into Java Objects",
+                .apply("Transform BigQuery table rows retrieved into Java RowData Objects",
                         MapElements.into(TypeDescriptor.of(RowData.class))
                                 .via(RowData::fromTableRow));
         return rows;
