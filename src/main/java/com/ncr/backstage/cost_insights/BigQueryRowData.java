@@ -33,5 +33,11 @@ class BigQueryRowData {
 
             return data;
         }
+
+        @Override
+        public String toString() {
+            return String.format("Costs incurred by %s on %s: %s-%s = %s", this.project_name, this.usage_start_day,
+                    this.service_description, this.sku_description, this.sum_cost);
+        }
     }
 }
