@@ -1,6 +1,5 @@
 package com.ncr.backstage.cost_insights;
 
-import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
@@ -15,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.api.services.bigquery.model.TableReference;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
+import com.ncr.backstage.cost_insights.PipelineRunner.DataflowPipelineOptions;
 import com.ncr.backstage.cost_insights.enums.BigQueryColumns;
 import com.ncr.backstage.cost_insights.enums.QueryReturnColumns;
 
@@ -30,21 +30,16 @@ public class BigQueryReader {
     private final Pipeline pipeline;
     /* The BigQuery table which is to be read from */
     private final TableReference tableReference;
-    /* Number of days the aggregation date is behind the current day */
-    private final int dayDelta;
 
     /**
      * Constructor
      * 
      * @param pipeline       is the apache beam pipeline being used
      * @param tableReference is the reference to the input BigQuery table
-     * @param dayDelta       is the number of days the aggregation date is behind
-     *                       the current day
      */
-    public BigQueryReader(Pipeline pipeline, TableReference tableReference, int dayDelta) {
+    public BigQueryReader(Pipeline pipeline, TableReference tableReference) {
         this.pipeline = pipeline;
         this.tableReference = tableReference;
-        this.dayDelta = dayDelta;
     }
 
     /**
@@ -53,27 +48,28 @@ public class BigQueryReader {
      * @return Returns a PCollection of rows
      */
     public PCollection<RowData> directReadWithSQLQuery() {
-        String tableReferenceString = String.format("`%s:%s.%s`", this.tableReference.getProjectId(),
+        DataflowPipelineOptions options = pipeline.getOptions().as(DataflowPipelineOptions.class);
+        String tableReferenceString = String.format("`%s.%s.%s`", this.tableReference.getProjectId(),
                 this.tableReference.getDatasetId(), this.tableReference.getTableId());
-        ZonedDateTime startOfToday = LocalDate.now().atStartOfDay(ZoneOffset.UTC);
-        String aggregationDate = startOfToday.minusDays(this.dayDelta).toLocalDate().toString();
-        String billingExportScanWindowEnd = startOfToday.toString();
+        ZonedDateTime startOfToday = options.getAggregationDate().atStartOfDay(ZoneOffset.UTC);
+        String aggregationDate = startOfToday.toLocalDate().toString();
+        String billingExportScanWindowEnd = startOfToday.plusDays(options.getDayDelta()).toLocalDate().toString();
 
         String query = String.format("SELECT\n" +
                 "  %1$s AS %2$s,\n" + // project.name, project_name
                 "  %3$s AS %4$s,\n" + // service.description, service_description
                 "  %5$s AS %6$s,\n" + // sku.description, sku_description
-                "  FORMAT_TIMESTAMP('%F', %7$s, 'UTC') AS %8$s,\n" + // usage_start_time, usage_start_day
+                "  FORMAT_TIMESTAMP('%%F', %7$s, 'UTC') AS %8$s,\n" + // usage_start_time, usage_start_day
                 "  UNIX_SECONDS(TIMESTAMP_TRUNC(%7$s, DAY, 'UTC')) AS %9$s,\n" + // usage_start_time,
                 // usage_start_day_epoch_seconds
-                "  SUM(%10$s) AS %11$s" + // cost, sum_cost
+                "  SUM(%10$s) AS %11$s\n" + // cost, sum_cost
                 "FROM\n" +
                 "  %12$s\n" + // tablereferenceString declared above
                 "WHERE\n" +
-                "  %13$s BETWEEN TIMESTAMP(%14$s)\n" + // partitiontime, aggregation date
-                "  AND TIMESTAMP(%15$s)\n" + // aggregation date + some days
+                "  %13$s BETWEEN TIMESTAMP('%14$s')\n" + // partitiontime, aggregation date
+                "  AND TIMESTAMP('%15$s')\n" + // aggregation date + some days
                 "  AND %10$s > 0\n" + // cost
-                "  AND STARTS_WITH(STRING(%7$s, 'UTC'), %14$s)\n" + // usage_start_time, aggregation date
+                "  AND STARTS_WITH(STRING(%7$s, 'UTC'), '%14$s')\n" + // usage_start_time, aggregation date
                 "GROUP BY\n" +
                 "  %2$s,\n" + // project_name
                 "  %4$s,\n" + // service_description
@@ -105,6 +101,7 @@ public class BigQueryReader {
         LOG.info("Setting aggregatiion date of {}, with a export scan window till the beginning of {}", aggregationDate,
                 billingExportScanWindowEnd);
         LOG.info("Query to be run on {}:\n{}", tableReferenceString, query);
+
         PCollection<RowData> rows = this.pipeline
                 .apply("Read from BigQuery table with query string",
                         BigQueryIO.readTableRows()

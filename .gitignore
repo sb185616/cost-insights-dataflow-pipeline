@@ -37,5 +37,5 @@ hs_err_pid*
 # Output files
 output/
 
-# Scratchpad
-scratch/
+# Test Data
+testData/

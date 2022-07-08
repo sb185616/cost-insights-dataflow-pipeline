@@ -1,9 +1,15 @@
 package com.ncr.backstage.cost_insights;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
@@ -14,8 +20,10 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.TypeDescriptor;
 
 import com.google.api.services.bigquery.model.TableReference;
+import com.google.api.services.bigquery.model.TableRow;
 import com.google.bigtable.repackaged.com.google.gson.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
@@ -47,17 +55,36 @@ public class PipelineRunner {
 
         void setBigtableTableId(String bigtableTableId);
 
-        @Description("JSON file containing the table reference to the BigQuery billing export table")
-        @Default.String("src/main/resources/tableInfo/bigqueryTableInfo.json")
-        String getBigQueryTableReferenceJSON();
+        @Description("The BigQuery project ID, this can be different than your Dataflow project")
+        String getBigQueryProjectId();
 
-        void setBigQueryTableReferenceJSON(String bigQueryTableReferenceJSON);
+        void setBigQueryProjectId(String bigQueryProjectId);
+
+        @Description("The BigQuery dataset ID")
+        String getBigQueryDatasetId();
+
+        void setBigQueryDatasetId(String bigQueryDatasetId);
+
+        @Description("The BigQuery table ID in the Dataset.")
+        String getBigQueryTableId();
+
+        void setBigQueryTableId(String bigQueryTableId);
+
+        @Default.String("gs://backstage-dataflow-pipeline/output")
+        String getOutputLocation();
+
+        void setOutputLocation(String outputLocation);
 
         @Description("Billing export scan window")
         @Default.Integer(2)
         int getDayDelta();
 
         void setDayDelta(int dayDelta);
+
+        @Description("Date for which costs are to be aggregated")
+        LocalDate getAggregationDate();
+
+        void setAggregationDate(LocalDate date);
     }
 
     /* Logger */
@@ -88,37 +115,39 @@ public class PipelineRunner {
      *                   cannot be read
      */
     public static void main(final String[] args) throws Exception {
-
         LOG.info("Creating Dataflow Aggregation Pipeline!");
         DataflowPipelineOptions options = PipelineOptionsFactory.fromArgs(args).withValidation()
                 .as(DataflowPipelineOptions.class);
         Pipeline pipeline = Pipeline.create(options);
 
-        TableReference input = PipelineRunner.getTableReference(options.getBigQueryTableReferenceJSON());
-        int dayDelta = options.getDayDelta();
+        TableReference input = new TableReference().setProjectId(options.getBigQueryProjectId())
+                .setDatasetId(options.getBigQueryDatasetId()).setTableId(options.getBigQueryTableId());
         String output = String.format("%s.%s.%s", options.getBigtableProjectId(), options.getBigtableInstanceId(),
                 options.getBigtableTableId());
 
-        LOG.info("Using {} as input BigQuery table\n Using {} as the output Bigtable table", input.toString(), output);
+        LOG.info("Using {} as input BigQuery table\nUsing {} as the output Bigtable table", input.toString(), output);
 
-        BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input, dayDelta);
-        PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
+        // BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
+        // PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
+
+        PCollection<RowData> rowsRetrieved = pipeline.apply(TestUtil.getValues("testData/tableRows/allrows"))
+                .apply(MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
 
         rowsRetrieved.apply(MapElements.via(new FormatAsTextFn()))
-                .apply("Write BQ rows to text file", TextIO.write().to("gs://backstage-dataflow-pipeline/output"));
+                .apply("Write BQ rows to text file", TextIO.write().to(options.getOutputLocation()));
 
-        // BigtableWriter bigtableWriter = new BigtableWriter(options);
+        BigtableWriter bigtableWriter = new BigtableWriter(pipeline);
         // PCollection<RowData> rowData =
         // bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
 
-        // bigtableWriter.applyRowMutations(rowData);
+        // bigtableWriter.applyRowMutations(rowsRetrieved);
 
         LOG.info("Running pipeline!");
         pipeline.run().waitUntilFinish();
 
     }
 
-    /** For testing */
+    /** For testing */ // TODO remove
     public static class FormatAsTextFn extends SimpleFunction<RowData, String> {
         @Override
         public String apply(RowData input) {

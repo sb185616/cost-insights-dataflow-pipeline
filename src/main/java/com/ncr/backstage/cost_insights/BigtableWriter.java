@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.transforms.Distinct;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.MapElements;
@@ -35,8 +36,8 @@ public class BigtableWriter {
 
     /* Logger */
     private static final Logger LOG = LoggerFactory.getLogger(BigtableWriter.class);
-    /* String reference to the Bigtable table */
-    final DataflowPipelineOptions options;
+    /* The pipeline for which the BigQuery reads are being performed */
+    private final Pipeline pipeline;
 
     /**
      * Transform that takes in a PCollection of RowData objects, and returns the
@@ -46,8 +47,19 @@ public class BigtableWriter {
      * Then it creates those column families in the output table that do not already
      * exist
      */
-    public class CheckColumnFamiliesAndReturnInput
+    public static class CheckColumnFamiliesAndReturnInput
             extends PTransform<PCollection<RowData>, PCollection<RowData>> {
+
+        String bigtableProjectId;
+        String bigtableInstanceId;
+        String bigtableTableId;
+
+        public CheckColumnFamiliesAndReturnInput(String bigtableProjectId, String bigtableInstanceId,
+                String bigtableTableId) {
+            this.bigtableProjectId = bigtableProjectId;
+            this.bigtableInstanceId = bigtableInstanceId;
+            this.bigtableTableId = bigtableTableId;
+        }
 
         @Override
         public PCollection<RowData> expand(PCollection<RowData> input) {
@@ -59,7 +71,9 @@ public class BigtableWriter {
             })).apply("Keeping only distinct service names", Distinct.<String>create())
                     .apply("Keeping only service names that do not exist as column families",
                             Filter.by(new FilterExistingFamilies(getSetOfExistingFamilies())))
-                    .apply("Creating required column families", ParDo.of(new CreateColumnFamily(options)));
+                    .apply("Creating required column families",
+                            ParDo.of(new CreateColumnFamily(this.bigtableProjectId,
+                                    this.bigtableInstanceId, this.bigtableTableId)));
 
             return input;
         }
@@ -94,10 +108,10 @@ public class BigtableWriter {
             Set<String> columnFamilies = null;
             try {
                 BigtableTableAdminSettings settings = BigtableTableAdminSettings.newBuilder()
-                        .setProjectId(options.getBigtableProjectId()).setInstanceId(options.getBigtableInstanceId())
+                        .setProjectId(this.bigtableProjectId).setInstanceId(this.bigtableInstanceId)
                         .build();
                 BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
-                Table table = adminClient.getTable(options.getBigtableTableId());
+                Table table = adminClient.getTable(this.bigtableTableId);
                 columnFamilies = table.getColumnFamilies().stream().map(x -> x.getId()).collect(Collectors.toSet());
                 adminClient.close();
             } catch (Exception e) {
@@ -111,22 +125,28 @@ public class BigtableWriter {
          */
         static class CreateColumnFamily extends DoFn<String, String> {
 
-            DataflowPipelineOptions options;
+            String bigtableProjectId;
+            String bigtableInstanceId;
+            String bigtableTableId;
 
-            CreateColumnFamily(DataflowPipelineOptions options) {
-                this.options = options;
+            CreateColumnFamily(String bigtableProjectId, String bigtableInstanceId, String bigtableTableId) {
+                this.bigtableProjectId = bigtableProjectId;
+                this.bigtableInstanceId = bigtableInstanceId;
+                this.bigtableTableId = bigtableTableId;
             }
 
             @ProcessElement
             public void processElement(@Element String familyName) {
                 try {
                     BigtableTableAdminSettings settings = BigtableTableAdminSettings.newBuilder()
-                            .setProjectId(options.getBigtableProjectId()).setInstanceId(options.getBigtableInstanceId())
+                            .setProjectId(this.bigtableProjectId).setInstanceId(this.bigtableInstanceId)
                             .build();
                     BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
-                    Table table = adminClient.getTable(options.getBigtableTableId());
+                    Table table = adminClient.getTable(this.bigtableTableId);
                     try {
-                        adminClient.modifyFamilies(ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
+                        // adminClient.awaitReplication(this.bigtableTableId);
+                        adminClient.modifyFamiliesAsync(
+                                ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
                         adminClient.close();
                     } catch (AlreadyExistsException innerException) { // Should not occur, but keeping it here for now
                         LOG.error(innerException.getMessage());
@@ -136,16 +156,15 @@ public class BigtableWriter {
                 }
             }
         }
-
     }
 
     /**
      * Constructor
-     *
-     * @param options are the pipeline options
+     * 
+     * @param pipeline is the pipeline running the transforms
      */
-    public BigtableWriter(DataflowPipelineOptions options) {
-        this.options = options;
+    public BigtableWriter(Pipeline pipeline) {
+        this.pipeline = pipeline;
     }
 
     /**
@@ -155,9 +174,11 @@ public class BigtableWriter {
      * @param rows is the PCollection of rows retrieved after querying BigQuery
      */
     public PCollection<RowData> createNeededColumnFamilies(PCollection<RowData> rows) {
+        DataflowPipelineOptions options = pipeline.getOptions().as(DataflowPipelineOptions.class);
         LOG.info("Applying transform for creating required column families that do not exist!");
         PCollection<RowData> rowsOut = rows.apply("Starting the process to create missing column families!",
-                new CheckColumnFamiliesAndReturnInput());
+                new CheckColumnFamiliesAndReturnInput(options.getBigtableProjectId(), options.getBigtableInstanceId(),
+                        options.getBigtableTableId()));
         return rowsOut;
     }
 
@@ -169,6 +190,7 @@ public class BigtableWriter {
      * @param mutations is the PCollection of mutations passed in
      */
     public void applyRowMutations(PCollection<RowData> rows) {
+        DataflowPipelineOptions options = pipeline.getOptions().as(DataflowPipelineOptions.class);
         LOG.info("Applying Bigtable Mutation Transform!");
         CloudBigtableTableConfiguration bigtableTableConfig = new CloudBigtableTableConfiguration.Builder()
                 .withProjectId(options.getBigtableProjectId())

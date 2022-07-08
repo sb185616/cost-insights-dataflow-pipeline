@@ -12,6 +12,8 @@ import com.ncr.backstage.cost_insights.enums.QueryReturnColumns;
  */
 class BigQueryRowData {
 
+    private static final String NULL_PROJECT = "null-project";
+
     @DefaultCoder(AvroCoder.class)
     static class RowData {
         String project_name;
@@ -24,20 +26,26 @@ class BigQueryRowData {
         public static RowData fromTableRow(TableRow row) {
             RowData data = new RowData();
 
-            data.project_name = (String) row.get(QueryReturnColumns.PROJECT_NAME.label);
-            data.service_description = (String) row.get(QueryReturnColumns.SERVICE_DESCRIPTION.label);
-            data.sku_description = (String) row.get(QueryReturnColumns.SKU_DESCRIPTION.label);
+            Object project_name_object = row.get(QueryReturnColumns.PROJECT_NAME.label);
+            data.project_name = project_name_object == null ? NULL_PROJECT : (String) project_name_object;
+            data.project_name = data.project_name.strip();
+            data.service_description = ((String) row.get(QueryReturnColumns.SERVICE_DESCRIPTION.label)).strip();
+            data.service_description = data.service_description.replace('/', '_').replace(' ', '_');
+            data.sku_description = ((String) row.get(QueryReturnColumns.SKU_DESCRIPTION.label)).strip();
             data.usage_start_day = (String) row.get(QueryReturnColumns.USAGE_START_DAY.label);
-            data.usage_start_day_epoch_seconds = (Long) row.get(QueryReturnColumns.USAGE_START_DAY_EPOCH_SECONDS.label);
-            data.sum_cost = ((Double) row.get(QueryReturnColumns.SUM_COST.label));
-
+            data.usage_start_day_epoch_seconds = Long
+                    .parseLong((String) row.get(QueryReturnColumns.USAGE_START_DAY_EPOCH_SECONDS.label));
+            // data.sum_cost = (Double) row.get(QueryReturnColumns.SUM_COST.label); // TODO
+            // change back
+            data.sum_cost = Double.parseDouble((String) row.get(QueryReturnColumns.SUM_COST.label));
             return data;
         }
 
         @Override
         public String toString() {
-            return String.format("Costs incurred by %s on %s: %s-%s = %s", this.project_name, this.usage_start_day,
-                    this.service_description, this.sku_description, this.sum_cost);
+            return String.format("%s incurred %s on %s for service %s-%s", this.project_name, this.sum_cost,
+                    this.usage_start_day,
+                    this.service_description, this.sku_description);
         }
     }
 }
