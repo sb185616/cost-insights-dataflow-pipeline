@@ -30,7 +30,7 @@ class BigQueryRowData {
             data.project_name = project_name_object == null ? NULL_PROJECT : (String) project_name_object;
             data.project_name = data.project_name.strip();
             data.service_description = ((String) row.get(QueryReturnColumns.SERVICE_DESCRIPTION.label)).strip();
-            data.service_description = data.service_description.replace('/', '_').replace(' ', '_');
+            data.service_description = data.service_description.replace('/', '-').replace(' ', '_');
             data.sku_description = ((String) row.get(QueryReturnColumns.SKU_DESCRIPTION.label)).strip();
             data.usage_start_day = (String) row.get(QueryReturnColumns.USAGE_START_DAY.label);
             data.usage_start_day_epoch_seconds = Long

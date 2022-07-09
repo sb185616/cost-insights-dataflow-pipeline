@@ -138,7 +138,7 @@ public class PipelineRunner {
 
         BigtableWriter bigtableWriter = new BigtableWriter(pipeline);
         // PCollection<RowData> rowData =
-        // bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
+        bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
 
         // bigtableWriter.applyRowMutations(rowsRetrieved);
 

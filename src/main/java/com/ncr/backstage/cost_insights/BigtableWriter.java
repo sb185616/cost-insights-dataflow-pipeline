@@ -94,6 +94,7 @@ public class BigtableWriter {
 
             @Override
             public Boolean apply(String family) {
+                // LOG.info("\n COLUMN FAMILY: {}", family);
                 return !this.existingFamilies.contains(family);
             }
         }
@@ -144,9 +145,9 @@ public class BigtableWriter {
                     BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
                     Table table = adminClient.getTable(this.bigtableTableId);
                     try {
-                        // adminClient.awaitReplication(this.bigtableTableId);
                         adminClient.modifyFamiliesAsync(
                                 ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
+                        adminClient.awaitReplication(this.bigtableTableId);
                         adminClient.close();
                     } catch (AlreadyExistsException innerException) { // Should not occur, but keeping it here for now
                         LOG.error(innerException.getMessage());
