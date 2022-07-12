@@ -29,16 +29,39 @@ class BigQueryRowData {
             Object project_name_object = row.get(QueryReturnColumns.PROJECT_NAME.label);
             data.project_name = project_name_object == null ? NULL_PROJECT : (String) project_name_object;
             data.project_name = data.project_name.strip();
-            data.service_description = ((String) row.get(QueryReturnColumns.SERVICE_DESCRIPTION.label)).strip();
-            data.service_description = data.service_description.replace('/', '-').replace(' ', '_');
+            data.service_description = formatColumnFamilyName(
+                    (String) row.get(QueryReturnColumns.SERVICE_DESCRIPTION.label));
             data.sku_description = ((String) row.get(QueryReturnColumns.SKU_DESCRIPTION.label)).strip();
             data.usage_start_day = (String) row.get(QueryReturnColumns.USAGE_START_DAY.label);
             data.usage_start_day_epoch_seconds = Long
                     .parseLong((String) row.get(QueryReturnColumns.USAGE_START_DAY_EPOCH_SECONDS.label));
-            // data.sum_cost = (Double) row.get(QueryReturnColumns.SUM_COST.label); // TODO
+            data.sum_cost = (Double) row.get(QueryReturnColumns.SUM_COST.label); // TODO
             // change back
-            data.sum_cost = Double.parseDouble((String) row.get(QueryReturnColumns.SUM_COST.label));
+            // data.sum_cost = Double.parseDouble((String)
+            // row.get(QueryReturnColumns.SUM_COST.label));
             return data;
+        }
+
+        private static String formatColumnFamilyName(String name) {
+            String formatted = name
+                    .strip() // remove leading or trailing whitespace
+                    .replaceAll("\\(.+?\\)", "") // remove parentheses and the string contained
+                    .strip() // remove leading or trailing whitespace from resulting string
+                    .replace(' ', '_') // replace whitespace between words with underscore
+                    .replaceAll("(\\W|^_)", ""); // remove special characters except underscore
+            return formatted.substring(0, Math.min(formatted.length(), 64)); // cut string down to 64 characters if
+                                                                             // longer
+        }
+
+        public static RowData fromRowData(RowData input) {
+            RowData output = new RowData();
+            output.project_name = input.project_name;
+            output.service_description = input.service_description;
+            output.sku_description = input.sku_description;
+            output.usage_start_day = input.usage_start_day;
+            output.usage_start_day_epoch_seconds = input.usage_start_day_epoch_seconds;
+            output.sum_cost = input.sum_cost;
+            return output;
         }
 
         @Override

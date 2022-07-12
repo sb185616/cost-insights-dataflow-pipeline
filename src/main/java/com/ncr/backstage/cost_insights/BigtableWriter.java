@@ -1,6 +1,5 @@
 package com.ncr.backstage.cost_insights;
 
-import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -13,9 +12,11 @@ import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.SimpleFunction;
+import org.apache.beam.sdk.transforms.Wait;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,19 +64,29 @@ public class BigtableWriter {
 
         @Override
         public PCollection<RowData> expand(PCollection<RowData> input) {
-            input.apply("Getting service name from each row", MapElements.via(new SimpleFunction<RowData, String>() {
-                @Override
-                public String apply(RowData data) {
-                    return data.service_description;
-                }
-            })).apply("Keeping only distinct service names", Distinct.<String>create())
+            PCollection<String> columnFamilies = input
+                    .apply("Getting service name from each row", MapElements.via(new SimpleFunction<RowData, String>() {
+                        @Override
+                        public String apply(RowData data) {
+                            return data.service_description;
+                        }
+                    })).apply("Keeping only distinct service names", Distinct.<String>create())
                     .apply("Keeping only service names that do not exist as column families",
                             Filter.by(new FilterExistingFamilies(getSetOfExistingFamilies())))
                     .apply("Creating required column families",
                             ParDo.of(new CreateColumnFamily(this.bigtableProjectId,
                                     this.bigtableInstanceId, this.bigtableTableId)));
 
-            return input;
+            PCollection<RowData> rowsPostProcessing = input
+                    .apply("Waiting on new column families to be created", Wait.on(columnFamilies))
+                    .apply("Dummy stage that is executed after the necessary column families are created",
+                            MapElements.via(new SimpleFunction<RowData, RowData>() {
+                                @Override
+                                public RowData apply(RowData row) {
+                                    return RowData.fromRowData(row);
+                                }
+                            }));
+            return rowsPostProcessing;
         }
 
         /**
@@ -94,7 +105,6 @@ public class BigtableWriter {
 
             @Override
             public Boolean apply(String family) {
-                // LOG.info("\n COLUMN FAMILY: {}", family);
                 return !this.existingFamilies.contains(family);
             }
         }
@@ -116,7 +126,7 @@ public class BigtableWriter {
                 columnFamilies = table.getColumnFamilies().stream().map(x -> x.getId()).collect(Collectors.toSet());
                 adminClient.close();
             } catch (Exception e) {
-                LOG.error("Could not fetch column families: {}", e.getMessage());
+                LOG.error("Could not fetch existing column families: {}", e.getMessage());
             }
             return columnFamilies == null ? new HashSet<String>() : columnFamilies;
         }
@@ -145,9 +155,9 @@ public class BigtableWriter {
                     BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
                     Table table = adminClient.getTable(this.bigtableTableId);
                     try {
-                        adminClient.modifyFamiliesAsync(
+                        adminClient.modifyFamilies(
                                 ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
-                        adminClient.awaitReplication(this.bigtableTableId);
+                        // adminClient.awaitReplication(this.bigtableTableId);
                         adminClient.close();
                     } catch (AlreadyExistsException innerException) { // Should not occur, but keeping it here for now
                         LOG.error(innerException.getMessage());
@@ -198,8 +208,9 @@ public class BigtableWriter {
                 .withInstanceId(options.getBigtableInstanceId())
                 .withTableId(options.getBigtableTableId())
                 .build();
-        rows.apply("Converting RowData objects to Mutations", MapElements.via(ROWDATA_MUTATION))
-                .apply("Writing mutations to Bigtable", CloudBigtableIO.writeToTable(bigtableTableConfig));
+        rows.apply("Converting RowData objects to Mutations",
+                MapElements.via(ROWDATA_MUTATION)).apply("Writing mutations to Bigtable",
+                        CloudBigtableIO.writeToTable(bigtableTableConfig));
     }
 
     /**
@@ -209,11 +220,12 @@ public class BigtableWriter {
 
         @Override
         public Mutation apply(RowData data) {
-            final byte[] ROW = (data.project_name + (((1L << 63) - 1) - data.usage_start_day_epoch_seconds)).getBytes();
-            final byte[] FAMILY = data.service_description.getBytes();
-            final byte[] QUALIFIER = data.sku_description.getBytes();
-            final Long TIMESTAMP = data.usage_start_day_epoch_seconds;
-            final byte[] VALUE = ByteBuffer.allocate(8).putDouble(data.sum_cost).array();
+            final byte[] ROW = Bytes
+                    .toBytes(data.project_name + (((1L << 63) - 1) - data.usage_start_day_epoch_seconds));
+            final byte[] FAMILY = Bytes.toBytes(data.service_description);
+            final byte[] QUALIFIER = Bytes.toBytes(data.sku_description);
+            final Long TIMESTAMP = data.usage_start_day_epoch_seconds * 1000;
+            final byte[] VALUE = Bytes.toBytes(data.sum_cost);
             Mutation mutation = new Put(ROW).addColumn(FAMILY, QUALIFIER, TIMESTAMP, VALUE);
             return mutation;
         }

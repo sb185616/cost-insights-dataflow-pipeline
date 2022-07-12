@@ -14,6 +14,17 @@ import com.google.api.services.bigquery.model.TableRow;
 /** Only keeping during testing, will be removed afterwards */
 public class TestUtil {
 
+    public static void main(String[] args) {
+        String s = "JFrog Enterprise (Complete DevOps Platform)";
+        String s2 = s
+                .strip()
+                .replaceAll("\\(.+?\\)", "")
+                .strip()
+                .replace(' ', '_')
+                .replaceAll("(\\W|^_)", "");
+        System.out.println(s2.substring(0, Math.min(s2.length(), 64)));
+    }
+
     public static Values<TableRow> getValues(String filepath) throws IOException {
         List<String> strings = Files.readAllLines(Paths.get(filepath));
         List<TableRow> list = stringsToTableRows(strings);

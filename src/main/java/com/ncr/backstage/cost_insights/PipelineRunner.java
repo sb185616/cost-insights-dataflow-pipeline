@@ -70,7 +70,7 @@ public class PipelineRunner {
 
         void setBigQueryTableId(String bigQueryTableId);
 
-        @Default.String("gs://backstage-dataflow-pipeline/output")
+        @Default.String("gs://backstage-dataflow-pipeline/bigquery_read_output")
         String getOutputLocation();
 
         void setOutputLocation(String outputLocation);
@@ -127,20 +127,20 @@ public class PipelineRunner {
 
         LOG.info("Using {} as input BigQuery table\nUsing {} as the output Bigtable table", input.toString(), output);
 
-        // BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
-        // PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
+        BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
+        PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
 
-        PCollection<RowData> rowsRetrieved = pipeline.apply(TestUtil.getValues("testData/tableRows/allrows"))
-                .apply(MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
+        // PCollection<RowData> rowsRetrieved =
+        // pipeline.apply(TestUtil.getValues("testData/tableRows/allrows"))
+        // .apply(MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
 
         rowsRetrieved.apply(MapElements.via(new FormatAsTextFn()))
                 .apply("Write BQ rows to text file", TextIO.write().to(options.getOutputLocation()));
 
         BigtableWriter bigtableWriter = new BigtableWriter(pipeline);
-        // PCollection<RowData> rowData =
-        bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
+        PCollection<RowData> rowData = bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
 
-        // bigtableWriter.applyRowMutations(rowsRetrieved);
+        bigtableWriter.applyRowMutations(rowData);
 
         LOG.info("Running pipeline!");
         pipeline.run().waitUntilFinish();
