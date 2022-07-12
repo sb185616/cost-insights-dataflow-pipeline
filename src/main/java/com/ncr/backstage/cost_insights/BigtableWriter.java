@@ -222,7 +222,7 @@ public class BigtableWriter {
         @Override
         public Mutation apply(RowData data) {
             final byte[] ROW = Bytes
-                    .toBytes(data.project_name + (((1L << 63) - 1) - data.usage_start_day_epoch_seconds));
+                    .toBytes(data.project_name + '#' + (((1L << 63) - 1) - data.usage_start_day_epoch_seconds));
             final byte[] FAMILY = Bytes.toBytes(data.service_description);
             final byte[] QUALIFIER = Bytes.toBytes(data.sku_description);
             final Long TIMESTAMP = data.usage_start_day_epoch_seconds * 1000;
