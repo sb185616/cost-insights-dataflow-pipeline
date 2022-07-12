@@ -1,15 +1,10 @@
 package com.ncr.backstage.cost_insights;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
@@ -20,10 +15,8 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.TypeDescriptor;
 
 import com.google.api.services.bigquery.model.TableReference;
-import com.google.api.services.bigquery.model.TableRow;
 import com.google.bigtable.repackaged.com.google.gson.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
@@ -69,6 +62,12 @@ public class PipelineRunner {
         String getBigQueryTableId();
 
         void setBigQueryTableId(String bigQueryTableId);
+
+        @Description("Set if the rows returned from querying BigQuery are to be written to a text file")
+        @Default.Boolean(false)
+        Boolean writeBQRowsToTextFile();
+
+        void setWriteBQRowsToTextFile(Boolean writeBQRowsToTextFile);
 
         @Default.String("gs://backstage-dataflow-pipeline/bigquery_read_output")
         String getOutputLocation();
@@ -130,12 +129,15 @@ public class PipelineRunner {
         BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
         PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
 
-        // PCollection<RowData> rowsRetrieved =
-        // pipeline.apply(TestUtil.getValues("testData/tableRows/allrows"))
-        // .apply(MapElements.into(TypeDescriptor.of(RowData.class)).via(RowData::fromTableRow));
-
-        rowsRetrieved.apply(MapElements.via(new FormatAsTextFn()))
-                .apply("Write BQ rows to text file", TextIO.write().to(options.getOutputLocation()));
+        if (options.writeBQRowsToTextFile()) {
+            rowsRetrieved.apply(
+                    MapElements.via(new SimpleFunction<RowData, String>() {
+                        @Override
+                        public String apply(RowData row) {
+                            return row.toString();
+                        }
+                    })).apply("Write BQ rows to text file", TextIO.write().to(options.getOutputLocation()));
+        }
 
         BigtableWriter bigtableWriter = new BigtableWriter(pipeline);
         PCollection<RowData> rowData = bigtableWriter.createNeededColumnFamilies(rowsRetrieved);
@@ -145,13 +147,5 @@ public class PipelineRunner {
         LOG.info("Running pipeline!");
         pipeline.run().waitUntilFinish();
 
-    }
-
-    /** For testing */ // TODO remove
-    public static class FormatAsTextFn extends SimpleFunction<RowData, String> {
-        @Override
-        public String apply(RowData input) {
-            return input.toString();
-        }
     }
 }

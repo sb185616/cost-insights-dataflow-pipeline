@@ -12,7 +12,10 @@ import com.ncr.backstage.cost_insights.enums.QueryReturnColumns;
  */
 class BigQueryRowData {
 
+    /** Name to be used if project name is missing from a table row */
     private static final String NULL_PROJECT = "null-project";
+    /** Max length for a column family identifier */
+    private static final Integer COLUMN_FAMILY_ID_MAX_LENGTH = 64;
 
     @DefaultCoder(AvroCoder.class)
     static class RowData {
@@ -23,6 +26,11 @@ class BigQueryRowData {
         Long usage_start_day_epoch_seconds;
         Double sum_cost;
 
+        /**
+         * Creates a RowData object from a TableRow
+         * 
+         * @param row is a TableRow object
+         */
         public static RowData fromTableRow(TableRow row) {
             RowData data = new RowData();
 
@@ -35,13 +43,17 @@ class BigQueryRowData {
             data.usage_start_day = (String) row.get(QueryReturnColumns.USAGE_START_DAY.label);
             data.usage_start_day_epoch_seconds = Long
                     .parseLong((String) row.get(QueryReturnColumns.USAGE_START_DAY_EPOCH_SECONDS.label));
-            data.sum_cost = (Double) row.get(QueryReturnColumns.SUM_COST.label); // TODO
-            // change back
-            // data.sum_cost = Double.parseDouble((String)
-            // row.get(QueryReturnColumns.SUM_COST.label));
+            data.sum_cost = (Double) row.get(QueryReturnColumns.SUM_COST.label);
             return data;
         }
 
+        /**
+         * Takes in a cloud service name, formats it and returns it to be used as a
+         * column family name
+         * 
+         * @param name is the unformatted service name
+         * @return formats the input name and returns it
+         */
         private static String formatColumnFamilyName(String name) {
             String formatted = name
                     .strip() // remove leading or trailing whitespace
@@ -49,10 +61,18 @@ class BigQueryRowData {
                     .strip() // remove leading or trailing whitespace from resulting string
                     .replace(' ', '_') // replace whitespace between words with underscore
                     .replaceAll("(\\W|^_)", ""); // remove special characters except underscore
-            return formatted.substring(0, Math.min(formatted.length(), 64)); // cut string down to 64 characters if
-                                                                             // longer
+            return formatted.substring(0, Math.min(formatted.length(), COLUMN_FAMILY_ID_MAX_LENGTH)); // cut string down
+                                                                                                      // to 64
+                                                                                                      // characters if
+                                                                                                      // it is longer
         }
 
+        /**
+         * Takes in a RowData object, and returns a cloned RowData object
+         * 
+         * @param input is a RowData object
+         * @return returns a cloned RowData object
+         */
         public static RowData fromRowData(RowData input) {
             RowData output = new RowData();
             output.project_name = input.project_name;
@@ -66,9 +86,9 @@ class BigQueryRowData {
 
         @Override
         public String toString() {
-            return String.format("%s incurred %s on %s for service %s-%s", this.project_name, this.sum_cost,
-                    this.usage_start_day,
-                    this.service_description, this.sku_description);
+            return String.format("Project: %s | Service: %s | Service SKU: %s | Usage Day: %s | Cost Incurred : %s",
+                    this.project_name, this.service_description, this.sku_description, this.usage_start_day,
+                    this.sum_cost);
         }
     }
 }

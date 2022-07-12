@@ -47,6 +47,8 @@ public class BigtableWriter {
      * that will be needed to add all the rows to the output table.
      * Then it creates those column families in the output table that do not already
      * exist
+     * Dummy transform stage is applied to be able to wait on the column family
+     * creation
      */
     public static class CheckColumnFamiliesAndReturnInput
             extends PTransform<PCollection<RowData>, PCollection<RowData>> {
@@ -157,7 +159,6 @@ public class BigtableWriter {
                     try {
                         adminClient.modifyFamilies(
                                 ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
-                        // adminClient.awaitReplication(this.bigtableTableId);
                         adminClient.close();
                     } catch (AlreadyExistsException innerException) { // Should not occur, but keeping it here for now
                         LOG.error(innerException.getMessage());
