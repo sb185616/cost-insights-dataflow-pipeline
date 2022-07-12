@@ -65,7 +65,7 @@ public class PipelineRunner {
 
         @Description("Set if the rows returned from querying BigQuery are to be written to a text file")
         @Default.Boolean(false)
-        Boolean writeBQRowsToTextFile();
+        Boolean getWriteBQRowsToTextFile();
 
         void setWriteBQRowsToTextFile(Boolean writeBQRowsToTextFile);
 
@@ -129,7 +129,7 @@ public class PipelineRunner {
         BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
         PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
 
-        if (options.writeBQRowsToTextFile()) {
+        if (options.getWriteBQRowsToTextFile()) {
             rowsRetrieved.apply(
                     MapElements.via(new SimpleFunction<RowData, String>() {
                         @Override
