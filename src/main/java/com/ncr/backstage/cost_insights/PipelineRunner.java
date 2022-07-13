@@ -12,6 +12,7 @@ import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.PCollection;
@@ -34,56 +35,56 @@ public class PipelineRunner {
     /** Pipeline options required */
     public interface DataflowPipelineOptions extends PipelineOptions {
         @Description("The Bigtable project ID, this can be different than your Dataflow project")
-        String getBigtableProjectId();
+        ValueProvider<String> getBigtableProjectId();
 
-        void setBigtableProjectId(String bigtableProjectId);
+        void setBigtableProjectId(ValueProvider<String> bigtableProjectId);
 
         @Description("The Bigtable instance ID")
-        String getBigtableInstanceId();
+        ValueProvider<String> getBigtableInstanceId();
 
-        void setBigtableInstanceId(String bigtableInstanceId);
+        void setBigtableInstanceId(ValueProvider<String> bigtableInstanceId);
 
         @Description("The Bigtable table ID in the instance.")
-        String getBigtableTableId();
+        ValueProvider<String> getBigtableTableId();
 
-        void setBigtableTableId(String bigtableTableId);
+        void setBigtableTableId(ValueProvider<String> bigtableTableId);
 
         @Description("The BigQuery project ID, this can be different than your Dataflow project")
-        String getBigQueryProjectId();
+        ValueProvider<String> getBigQueryProjectId();
 
-        void setBigQueryProjectId(String bigQueryProjectId);
+        void setBigQueryProjectId(ValueProvider<String> bigQueryProjectId);
 
         @Description("The BigQuery dataset ID")
-        String getBigQueryDatasetId();
+        ValueProvider<String> getBigQueryDatasetId();
 
-        void setBigQueryDatasetId(String bigQueryDatasetId);
+        void setBigQueryDatasetId(ValueProvider<String> bigQueryDatasetId);
 
         @Description("The BigQuery table ID in the Dataset.")
-        String getBigQueryTableId();
+        ValueProvider<String> getBigQueryTableId();
 
-        void setBigQueryTableId(String bigQueryTableId);
+        void setBigQueryTableId(ValueProvider<String> bigQueryTableId);
 
         @Description("Set if the rows returned from querying BigQuery are to be written to a text file")
         @Default.Boolean(false)
-        Boolean getWriteBQRowsToTextFile();
+        ValueProvider<Boolean> getWriteBQRowsToTextFile();
 
-        void setWriteBQRowsToTextFile(Boolean writeBQRowsToTextFile);
+        void setWriteBQRowsToTextFile(ValueProvider<Boolean> writeBQRowsToTextFile);
 
         @Default.String("gs://backstage-dataflow-pipeline/bigquery_read_output")
-        String getOutputLocation();
+        ValueProvider<String> getOutputLocation();
 
-        void setOutputLocation(String outputLocation);
+        void setOutputLocation(ValueProvider<String> outputLocation);
 
         @Description("Billing export scan window")
         @Default.Integer(2)
-        int getDayDelta();
+        ValueProvider<Integer> getDayDelta();
 
-        void setDayDelta(int dayDelta);
+        void setDayDelta(ValueProvider<Integer> dayDelta);
 
         @Description("Date for which costs are to be aggregated")
-        LocalDate getAggregationDate();
+        ValueProvider<LocalDate> getAggregationDate();
 
-        void setAggregationDate(LocalDate date);
+        void setAggregationDate(ValueProvider<LocalDate> date);
     }
 
     /* Logger */
@@ -119,8 +120,8 @@ public class PipelineRunner {
                 .as(DataflowPipelineOptions.class);
         Pipeline pipeline = Pipeline.create(options);
 
-        TableReference input = new TableReference().setProjectId(options.getBigQueryProjectId())
-                .setDatasetId(options.getBigQueryDatasetId()).setTableId(options.getBigQueryTableId());
+        TableReference input = new TableReference().setProjectId(options.getBigQueryProjectId().get())
+                .setDatasetId(options.getBigQueryDatasetId().get()).setTableId(options.getBigQueryTableId().get());
         String output = String.format("%s.%s.%s", options.getBigtableProjectId(), options.getBigtableInstanceId(),
                 options.getBigtableTableId());
 
@@ -129,7 +130,7 @@ public class PipelineRunner {
         BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
         PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
 
-        if (options.getWriteBQRowsToTextFile()) {
+        if (options.getWriteBQRowsToTextFile().get()) {
             rowsRetrieved.apply(
                     MapElements.via(new SimpleFunction<RowData, String>() {
                         @Override

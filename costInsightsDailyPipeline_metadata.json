@@ -1,0 +1,60 @@
+{
+    "name": "Cost Insights Daily Pipeline",
+    "description": "Pipeline to aggregate google cloud costs incurred in any given day.",
+    "parameters": [
+        {
+            "name": "bigQueryProjectId",
+            "helpText": "The Google Cloud project where the billing export dataset is stored",
+            "label": "BigQuery Project ID",
+            "isOptional": false
+        },
+        {
+            "name": "bigQueryDatasetId",
+            "helpText": "The dataset within BigQuery where the billing export table exists",
+            "label": "BigQuery Dataset ID",
+            "isOptional": false
+        },
+        {
+            "name": "bigQueryTableId",
+            "helpText": "The BigQuery table where the billing export data is stored",
+            "label": "BigQuery Table ID",
+            "isOptional": false
+        },
+        {
+            "name": "bigtableProjectId",
+            "helpText": "The Google Cloud project where the Bigtable exports are to be made",
+            "label": "Bigtable Project ID",
+            "isOptional": false
+        },
+        {
+            "name": "bigtableInstanceId",
+            "helpText": "The Bigtable instance where the required table exists",
+            "label": "Bigtable Instance ID",
+            "isOptional": false
+        },
+        {
+            "name": "bigtableTableId",
+            "helpText": "The Bigtable table where the compiled data is to be exported",
+            "label": "Bigtable Table ID",
+            "isOptional": false
+        },
+        {
+            "name": "writeBQRowsToTextFile",
+            "helpText": "Set to true if rows retrieved from BigQuery need to be written to a text file. Meant for testing, defaults to false",
+            "label": "Write BigQuery Rows to text file",
+            "isOptional": true
+        },
+        {
+            "name": "outputLocation",
+            "helpText": "Location where the BigQuery rows formatted to text are to be written. Will not make a difference if writeBQRowsToTextFile is set to false",
+            "label": "Output Location",
+            "isOptional": true
+        },
+        {
+            "name": "aggregationDate",
+            "helpText": "The date (in YYYY-MM-DD format) for which cost aggregations are to be done",
+            "label": "Aggregation Date",
+            "isOptional": false
+        }
+    ]
+}

@@ -51,9 +51,9 @@ public class BigQueryReader {
         DataflowPipelineOptions options = pipeline.getOptions().as(DataflowPipelineOptions.class);
         String tableReferenceString = String.format("`%s.%s.%s`", this.tableReference.getProjectId(),
                 this.tableReference.getDatasetId(), this.tableReference.getTableId());
-        ZonedDateTime startOfToday = options.getAggregationDate().atStartOfDay(ZoneOffset.UTC);
+        ZonedDateTime startOfToday = options.getAggregationDate().get().atStartOfDay(ZoneOffset.UTC);
         String aggregationDate = startOfToday.toLocalDate().toString();
-        String billingExportScanWindowEnd = startOfToday.plusDays(options.getDayDelta()).toLocalDate().toString();
+        String billingExportScanWindowEnd = startOfToday.plusDays(options.getDayDelta().get()).toLocalDate().toString();
 
         String query = String.format("SELECT\n" +
                 "  %1$s AS %2$s,\n" + // project.name, project_name
@@ -105,6 +105,7 @@ public class BigQueryReader {
         PCollection<RowData> rows = this.pipeline
                 .apply("Read from BigQuery table with query string",
                         BigQueryIO.readTableRows()
+                                .withTemplateCompatibility()
                                 .fromQuery(query)
                                 .usingStandardSql()
                                 .withMethod(Method.DIRECT_READ))

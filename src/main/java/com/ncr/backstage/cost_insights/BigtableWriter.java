@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.Distinct;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.MapElements;
@@ -53,12 +54,13 @@ public class BigtableWriter {
     public static class CheckColumnFamiliesAndReturnInput
             extends PTransform<PCollection<RowData>, PCollection<RowData>> {
 
-        String bigtableProjectId;
-        String bigtableInstanceId;
-        String bigtableTableId;
+        ValueProvider<String> bigtableProjectId;
+        ValueProvider<String> bigtableInstanceId;
+        ValueProvider<String> bigtableTableId;
 
-        public CheckColumnFamiliesAndReturnInput(String bigtableProjectId, String bigtableInstanceId,
-                String bigtableTableId) {
+        public CheckColumnFamiliesAndReturnInput(ValueProvider<String> bigtableProjectId,
+                ValueProvider<String> bigtableInstanceId,
+                ValueProvider<String> bigtableTableId) {
             this.bigtableProjectId = bigtableProjectId;
             this.bigtableInstanceId = bigtableInstanceId;
             this.bigtableTableId = bigtableTableId;
@@ -121,10 +123,10 @@ public class BigtableWriter {
             Set<String> columnFamilies = null;
             try {
                 BigtableTableAdminSettings settings = BigtableTableAdminSettings.newBuilder()
-                        .setProjectId(this.bigtableProjectId).setInstanceId(this.bigtableInstanceId)
+                        .setProjectId(this.bigtableProjectId.get()).setInstanceId(this.bigtableInstanceId.get())
                         .build();
                 BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
-                Table table = adminClient.getTable(this.bigtableTableId);
+                Table table = adminClient.getTable(this.bigtableTableId.get());
                 columnFamilies = table.getColumnFamilies().stream().map(x -> x.getId()).collect(Collectors.toSet());
                 adminClient.close();
             } catch (Exception e) {
@@ -138,11 +140,12 @@ public class BigtableWriter {
          */
         static class CreateColumnFamily extends DoFn<String, String> {
 
-            String bigtableProjectId;
-            String bigtableInstanceId;
-            String bigtableTableId;
+            ValueProvider<String> bigtableProjectId;
+            ValueProvider<String> bigtableInstanceId;
+            ValueProvider<String> bigtableTableId;
 
-            CreateColumnFamily(String bigtableProjectId, String bigtableInstanceId, String bigtableTableId) {
+            CreateColumnFamily(ValueProvider<String> bigtableProjectId, ValueProvider<String> bigtableInstanceId,
+                    ValueProvider<String> bigtableTableId) {
                 this.bigtableProjectId = bigtableProjectId;
                 this.bigtableInstanceId = bigtableInstanceId;
                 this.bigtableTableId = bigtableTableId;
@@ -152,10 +155,10 @@ public class BigtableWriter {
             public void processElement(@Element String familyName) {
                 try {
                     BigtableTableAdminSettings settings = BigtableTableAdminSettings.newBuilder()
-                            .setProjectId(this.bigtableProjectId).setInstanceId(this.bigtableInstanceId)
+                            .setProjectId(this.bigtableProjectId.get()).setInstanceId(this.bigtableInstanceId.get())
                             .build();
                     BigtableTableAdminClient adminClient = BigtableTableAdminClient.create(settings);
-                    Table table = adminClient.getTable(this.bigtableTableId);
+                    Table table = adminClient.getTable(this.bigtableTableId.get());
                     try {
                         adminClient.modifyFamilies(
                                 ModifyColumnFamiliesRequest.of(table.getId()).addFamily(familyName));
