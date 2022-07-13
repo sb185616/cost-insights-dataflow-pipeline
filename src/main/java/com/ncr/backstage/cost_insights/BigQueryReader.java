@@ -12,7 +12,6 @@ import org.apache.beam.sdk.values.TypeDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.api.services.bigquery.model.TableReference;
 import com.ncr.backstage.cost_insights.BigQueryRowData.RowData;
 import com.ncr.backstage.cost_insights.PipelineRunner.DataflowPipelineOptions;
 import com.ncr.backstage.cost_insights.enums.BigQueryColumns;
@@ -28,18 +27,14 @@ public class BigQueryReader {
     private static final Logger LOG = LoggerFactory.getLogger(BigQueryReader.class);
     /* The pipeline for which the BigQuery reads are being performed */
     private final Pipeline pipeline;
-    /* The BigQuery table which is to be read from */
-    private final TableReference tableReference;
 
     /**
      * Constructor
      * 
-     * @param pipeline       is the apache beam pipeline being used
-     * @param tableReference is the reference to the input BigQuery table
+     * @param pipeline is the apache beam pipeline being used
      */
-    public BigQueryReader(Pipeline pipeline, TableReference tableReference) {
+    public BigQueryReader(Pipeline pipeline) {
         this.pipeline = pipeline;
-        this.tableReference = tableReference;
     }
 
     /**
@@ -49,8 +44,8 @@ public class BigQueryReader {
      */
     public PCollection<RowData> directReadWithSQLQuery() {
         DataflowPipelineOptions options = pipeline.getOptions().as(DataflowPipelineOptions.class);
-        String tableReferenceString = String.format("`%s.%s.%s`", this.tableReference.getProjectId(),
-                this.tableReference.getDatasetId(), this.tableReference.getTableId());
+        String tableReferenceString = String.format("`%s.%s.%s`", options.getBigQueryProjectId(),
+                options.getBigQueryDatasetId(), options.getBigQueryTableId());
         ZonedDateTime startOfToday = options.getAggregationDate().atStartOfDay(ZoneOffset.UTC);
         String aggregationDate = startOfToday.toLocalDate().toString();
         String billingExportScanWindowEnd = startOfToday.plusDays(options.getDayDelta()).toLocalDate().toString();

@@ -119,14 +119,14 @@ public class PipelineRunner {
                 .as(DataflowPipelineOptions.class);
         Pipeline pipeline = Pipeline.create(options);
 
-        TableReference input = new TableReference().setProjectId(options.getBigQueryProjectId())
-                .setDatasetId(options.getBigQueryDatasetId()).setTableId(options.getBigQueryTableId());
+        String input = String.format("%s.%s.%s", options.getBigQueryProjectId(), options.getBigQueryDatasetId(),
+                options.getBigQueryTableId());
         String output = String.format("%s.%s.%s", options.getBigtableProjectId(), options.getBigtableInstanceId(),
                 options.getBigtableTableId());
 
-        LOG.info("Using {} as input BigQuery table\nUsing {} as the output Bigtable table", input.toString(), output);
+        LOG.info("Using {} as input BigQuery table\nUsing {} as the output Bigtable table", input, output);
 
-        BigQueryReader bigQueryReader = new BigQueryReader(pipeline, input);
+        BigQueryReader bigQueryReader = new BigQueryReader(pipeline);
         PCollection<RowData> rowsRetrieved = bigQueryReader.directReadWithSQLQuery();
 
         if (options.getWriteBQRowsToTextFile()) {
