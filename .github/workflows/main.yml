@@ -1,7 +1,7 @@
 name: Dataflow Pipeline Daily Runner
 
 env:
-  JOB_NAME: cost-insights-aggregator-pipeline
+  JOB_NAME: daily-billing-export-aggregator
   #
   PROJECT: ${{ secrets.DATAFLOW_PROJECT }}
   #
@@ -11,7 +11,7 @@ env:
   #
   BIGQUERY_TABLE_ID: ${{ secrets.BIGQUERY_TABLE_ID }}
   #
-  BIGTABLE_PROJECT_ID: ${{ secrets.BIGTABLE_TABLE_ID }}
+  BIGTABLE_PROJECT_ID: ${{ secrets.BIGTABLE_PROJECT_ID }}
   #
   BIGTABLE_INSTANCE_ID: ${{ secrets.BIGTABLE_INSTANCE_ID }}
   #
@@ -19,7 +19,7 @@ env:
   #
   SERVICE_ACCOUNT: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
   #
-  GCP_TEMP_LOCATION: gs://backstage-dataflow-pipeline/temp/
+  GCP_TEMP_LOCATION: ${{ secrets.GCP_TEMP_LOCATION }}
   #
   REGION: us-central1
 
