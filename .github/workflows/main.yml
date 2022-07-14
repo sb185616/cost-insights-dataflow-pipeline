@@ -26,7 +26,7 @@ env:
 on:
   schedule:
     # Would be 0 0 * * * for 00:00 UTC
-    - cron: 0 0 * * *
+    - cron: 0 16 * * *
 
 jobs:
   run_pipeline:
@@ -59,7 +59,7 @@ jobs:
           mvn -Pdataflow-runner compile exec:java \
               -Dexec.mainClass=com.ncr.backstage.cost_insights.PipelineRunner \
               -Dexec.cleanupDaemonThreads=false \
-              -Dexec.args="--$JOB_NAME \
+              -Dexec.args="--jobName=$JOB_NAME \
               --project=$PROJECT \
               --serviceAccount=$SERVICE_ACCOUNT \
               --gcpTempLocation=$GCP_TEMP_LOCATION \
