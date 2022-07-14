@@ -1,0 +1,76 @@
+name: Dataflow Pipeline Daily Runner
+
+env:
+  JOB_NAME: cost-insights-aggregator-pipeline
+  #
+  PROJECT: ${{ secrets.DATAFLOW_PROJECT }}
+  #
+  BIGQUERY_PROJECT_ID: ${{ secrets.BIGQUERY_PROJECT_ID }}
+  #
+  BIGQUERY_DATASET_ID: ${{ secrets.BIGQUERY_DATASET_ID }}
+  #
+  BIGQUERY_TABLE_ID: ${{ secrets.BIGQUERY_TABLE_ID }}
+  #
+  BIGTABLE_PROJECT_ID: ${{ secrets.BIGTABLE_TABLE_ID }}
+  #
+  BIGTABLE_INSTANCE_ID: ${{ secrets.BIGTABLE_INSTANCE_ID }}
+  #
+  BIGTABLE_TABLE_ID: ${{ secrets.BIGTABLE_TABLE_ID }}
+  #
+  SERVICE_ACCOUNT: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
+  #
+  GCP_TEMP_LOCATION: gs://backstage-dataflow-pipeline/temp/
+  #
+  REGION: us-central1
+
+on:
+  schedule:
+    # Would be 0 0 * * * for 00:00 UTC
+    - cron: 50 15 * * *
+
+jobs:
+  run_pipeline:
+    name: Run the dataflow pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: development
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "adopt"
+
+      - name: Set the aggregation date
+        run: |
+          echo "AGGREGATION_DATE=$(date -u -v-2d +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GOOGLE_CREDENTIALS }}"
+
+      - name: Run the pipeline
+        run: |
+          mvn -Pdataflow-runner compile exec:java \
+              -Dexec.mainClass=com.ncr.backstage.cost_insights.PipelineRunner \
+              -Dexec.cleanupDaemonThreads=false \
+              -Dexec.args="--$JOB_NAME \
+              --project=$PROJECT \
+              --serviceAccount=$SERVICE_ACCOUNT \
+              --gcpTempLocation=$GCP_TEMP_LOCATION \
+              --bigQueryProjectId=$BIGQUERY_PROJECT_ID \
+              --bigQueryDatasetId=$BIGQUERY_DATASET_ID \
+              --bigQueryTableId=$BIGQUERY_TABLE_ID \
+              --bigtableProjectId=$BIGTABLE_PROJECT_ID \
+              --bigtableInstanceId=$BIGTABLE_INSTANCE_ID \
+              --bigtableTableId=$BIGTABLE_TABLE_ID \
+              --writeBQRowsToTextFile=true \
+              --aggregationDate=$AGGREGATION_DATE \
+              --runner=DataflowRunner \
+              --numberOfWorkerHarnessThreads=1 \
+              --region=$REGION"
